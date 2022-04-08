@@ -72,6 +72,50 @@ export function classifyTwoGaussData(numSamples: number, noise: number):
   return points;
 }
 
+export function example2DToArray(points: Example2D[]): number[][] {
+	let out: number[][] = [];
+	points.forEach(eg => {
+		out.push([eg.x, eg.y]);
+		});
+	return out;
+}
+
+export function arraysToExample2D(p1: number[], p2: number[], labels: number[]): Example2D[] {
+	let points: Example2D[] = [];
+	if (p1.length!=p2.length || p2.length!=labels.length) {
+		alert("arrays must be of equal length " + p1.length + " " + p2.length + " " + labels.length);
+		return points;
+	}
+	for (let i = 0; i < p1.length; i++) {
+  		let x = p1[i];
+		let y = p2[i];
+		let label = labels[i];
+		points.push({x, y, label});
+	}
+	return points;
+}
+
+export function oneHot(data: string[]): number[][] {
+	let myset = Array.from(new Set(data));
+	const len = myset.length;
+	let toOut : number[][] = [];
+	for (var i=0; i<len; i++) {
+		toOut[i]=[];
+		}
+	data.forEach(row => {
+		let idx = myset.indexOf(row);
+		for (var i=0; i<len; i++) {
+			if (i==idx) {
+				toOut[idx].push(1);
+			} else {
+				toOut[i].push(0);
+			}
+		}
+	});
+	return toOut;
+}
+
+
 export function regressPlane(numSamples: number, noise: number):
   Example2D[] {
   let radius = 6;

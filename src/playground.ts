@@ -14,6 +14,9 @@ limitations under the License.
 ==============================================================================*/
 
 import * as nn from "./nn";
+import * as ml from 'machinelearn';
+import * as numeric from 'numeric';
+
 import {HeatMap, reduceMatrix} from "./heatmap";
 import {
   State,
@@ -25,11 +28,13 @@ import {
   getKeyFromValue,
   Problem
 } from "./state";
-import {Example2D, shuffle} from "./dataset";
+import {Example2D, shuffle, example2DToArray, arraysToExample2D, oneHot} from "./dataset";
 import {AppendingLineChart} from "./linechart";
 import * as d3 from 'd3';
 
 let mainWidth;
+
+const pca = new ml.decomposition.PCA(); 
 
 // More scrolling
 d3.select(".more button").on("click", function() {
@@ -1087,6 +1092,104 @@ function generateData(firstTime = false) {
   heatMap.updateTestPoints(state.showTestData ? testData : []);
 }
 
+function readFileData() {
+	alert("readfile");
+	d3.select('#dataFile').on("change", function(event: Event) {
+	  var file = this.files[0];
+	  var reader = new FileReader();
+	reader.readAsText(file);
+	  reader.onload = () => {
+		var filecontent = <string>(reader.result);
+		
+		let indata: any[][] = [];  
+		var rown=0
+		var rows = filecontent.trim().split(/\r?\n/);
+		let slabels: string[] = [];	
+		let labels: number[] = [];	
+		var coln=0;
+		let columns: any[][] = [];
+			
+		rows.forEach(row => {
+			var nums = row.split(",");
+			var lbl = nums.pop();
+			slabels.push(lbl);
+				if (!isNaN(+lbl)) {
+					labels.push(+lbl); // == 1? 1: -1);
+				} else {
+					labels.push(lbl == "true"? 1: -1);
+				}
+			nums.forEach(num => {
+				if (rown == 0) {
+					columns[coln]=[];
+				}
+				if (!isNaN(+num)) {
+				columns[coln].push(+num);
+				} else if (typeof num == "undefined") {
+					(alert("ud: " + num));
+				} else if (typeof num == "string") {
+					if (num == "true") {
+						columns[coln].push(<boolean>true);
+					} else if (num == "false") {
+						columns[coln].push(<boolean>false);
+					}
+					else {columns[coln].push(num);}
+				}
+				coln++;
+			
+			});
+			rown++;
+			coln = 0;
+		});
+//	let ohe = new ml.preprocessing.OneHotEncoder();
+	const minmaxScaler = new ml.preprocessing.MinMaxScaler({ featureRange: [-1, 1] });
+			
+	columns.forEach(column => {
+		if (typeof(column[0]) == "number") {
+			//const out = ml.preprocessing.normalize(column);
+			const out = minmaxScaler.fit_transform(column);
+			indata.push(out);
+			
+		} else {
+			let out = oneHot(column);
+			out.forEach(row => {
+				indata.push(row);
+			});
+			
+		
+		}
+		
+	});
+	indata = numeric.transpose(indata);
+			
+	// Split into train and test data.
+		slabels.shift();
+		labels.shift();
+		indata.shift();
+		try {
+			pca.fit(indata); 
+		} catch (error) {
+			alert("Applying principal convergence to your data gives is problematic: " + error);
+		}
+		let comp = numeric.dot(indata, pca.components);
+		let pc1 = numeric.transpose(comp)[0];
+		alert("comp1 "+ pc1);
+		let pc2 = numeric.transpose(comp)[1];
+		const minmaxScalerPc = new ml.preprocessing.MinMaxScaler({ featureRange: [-5, 5] });
+	
+		const s1 = minmaxScalerPc.fit(pc1);
+		let out = arraysToExample2D(<number[]>minmaxScalerPc.transform(pc1), <number[]>minmaxScalerPc.transform(pc2), labels);
+		 let splitIndex = Math.floor(out.length * state.percTrainData / 100);
+		  trainData = out.slice(0, splitIndex);
+		  testData = out.slice(splitIndex);
+		
+		  heatMap.updatePoints(trainData);
+		  heatMap.updateTestPoints(state.showTestData ? testData : []);
+		}; 
+	
+	
+	});
+}
+
 let firstInteraction = true;
 let parametersChanged = false;
 
@@ -1117,5 +1220,6 @@ drawDatasetThumbnails();
 initTutorial();
 makeGUI();
 generateData(true);
+readFileData();
 reset(true);
 hideControls();
